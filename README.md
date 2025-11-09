@@ -1,5 +1,5 @@
 <div align="center">
-    <img src="Now-Playing/Icons/" width=200 height=200>
+    <img src="Now-Playing/Icons/Now Playing-macOS-Default-1024x1024@1x.png" width=200 height=200>
     <h1>Now Playing</h1>
 </div>
 
