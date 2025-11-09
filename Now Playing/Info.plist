@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleIdentifier</key>
+    <string>com.rki.Now-Playing</string>
+    <key>CFBundleVersion</key>
+    <string>1.0</string>
+    <key>Privacy - Accessibility Usage Description</key>
+    <string>This app needs permission to control media playback (Play, Pause, Next) for your music apps.</string>
+    <key>NSAccessibilityUsageDescription</key>
+    <string>This app needs permission to press the media keys (Play/Pause, Next, Previous) to control music playback.</string>
+    
+    <!-- This is the general prompt for AppleScript -->
+    <key>NSAppleEventsUsageDescription</key>
+    <string>This app needs to control your music apps (like Apple Music and Spotify) to display now playing information.</string>
+    
+    <!--
+    It's good practice to also include specific descriptions.
+    This one will be shown when your app first tries to script Spotify.
+    -->
+    <key>com.spotify.client</key>
+    <string>This app needs to control Spotify to show the currently playing song, artist, and album art.</string>
+    
+    <!--
+    This one will be shown when your app first tries to script Apple Music.
+    -->
+    <key>com.apple.Music</key>
+    <string>This app needs to control Apple Music to show the currently playing song, artist, and album art.</string>
+    
+    <!-- These are for Media Library access (e.g., playlists, non-script artwork) -->
+    <key>NSAppleMusicUsageDescription</key>
+    <string>This app needs access to your Apple Music library to show what’s playing.</string>
+    <key>NSMusicUsageDescription</key>
+    <string>This app needs access to your music library.</string>
+    <key>NSMediaLibraryUsageDescription</key>
+    <string>This app needs access to your media library.</string>
+    
+    <!-- NEW SECTION FOR SPOTIFY ARTWORK  -->
+    <!-- This allows the app to make network requests to any http/https URL -->
+    <!-- This is necessary to download album art from Spotify -->
+    <key>NSAppTransportSecurity</key>
+    <dict>
+        <key>NSAllowsArbitraryLoads</key>
+        <true/>
+    </dict>
+    <!-- --- END OF NEW SECTION --- -->
+    
+</dict>
+</plist>
