@@ -5,7 +5,7 @@
 
 A simple, beautiful "Now Playing" app for macOS that shows the currently playing song from all your favorite music players. Built entirely in SwiftUI.
 
-![Now Playing App Screenshot](screenshot.png)
+![Now Playing App Screenshot](header.png)
 
 ## Features
 
