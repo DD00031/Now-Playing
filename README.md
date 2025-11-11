@@ -17,7 +17,7 @@ A simple, beautiful "Now Playing" app for macOS that shows the currently playing
 
 > **Note:** Retrieving album art for Spotify requires an active internet connection.
 
-> **Note:** Integration with Foobar2000 requires a [component](https://github.com/DD00031/now-playing-foobar). 
+> **Note:** Integration with Foobar2000 requires a [component](https://github.com/DD00031/foo-now-playing). 
 
 ## Supported Players
 
@@ -51,7 +51,7 @@ On the first run, macOS will ask for several permissions: `Accessibility` and `A
 
 After this the app will work for Spotify and Apple Music. To use the app with Foobar2000 you will need to install a component that caches the data of the currently playing media. 
 
-For download and setup instructions: https://github.com/DD00031/now-playing-foobar
+For download and setup instructions: [https://github.com/DD00031/now-playing-foobar](https://github.com/DD00031/foo-now-playing)
 
 ## License
 Now Playing is available under the GPL-3.0 license.
