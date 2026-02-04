@@ -6,13 +6,42 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXCopyFilesBuildPhase section */
+		66D09F992F3271910078C7EA /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
 		662D42972EB3B91000722436 /* Now Playing.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Now Playing.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet section */
+		66D09F9A2F3271910078C7EA /* Exceptions for "Now Playing" folder in "Embed Frameworks" phase from "Now Playing" target */ = {
+			isa = PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet;
+			attributesByRelativePath = {
+				Frameworks/MediaRemoteAdapter.framework = (CodeSignOnCopy, RemoveHeadersOnCopy, );
+			};
+			buildPhase = 66D09F992F3271910078C7EA /* Embed Frameworks */;
+			membershipExceptions = (
+				Frameworks/MediaRemoteAdapter.framework,
+			);
+		};
+/* End PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		662D42992EB3B91000722436 /* Now Playing */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				66D09F9A2F3271910078C7EA /* Exceptions for "Now Playing" folder in "Embed Frameworks" phase from "Now Playing" target */,
+			);
 			path = "Now Playing";
 			sourceTree = "<group>";
 		};
@@ -33,6 +62,7 @@
 			isa = PBXGroup;
 			children = (
 				662D42992EB3B91000722436 /* Now Playing */,
+				66D09F8A2F326F5F0078C7EA /* Frameworks */,
 				662D42982EB3B91000722436 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -45,6 +75,13 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
+		66D09F8A2F326F5F0078C7EA /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -55,6 +92,7 @@
 				662D42932EB3B91000722436 /* Sources */,
 				662D42942EB3B91000722436 /* Frameworks */,
 				662D42952EB3B91000722436 /* Resources */,
+				66D09F992F3271910078C7EA /* Embed Frameworks */,
 			);
 			buildRules = (
 			);
@@ -272,8 +310,18 @@
 				ENABLE_RESOURCE_ACCESS_PRINTING = NO;
 				ENABLE_RESOURCE_ACCESS_USB = NO;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/Now\\ Playing/mediaremote-adapter/build",
+					"$(PROJECT_DIR)/Now\\ Playing/mediaremote-adapter/build",
+					"$(PROJECT_DIR)/Now\\ Playing/Frameworks",
+					"$(PROJECT_DIR)/Now\\ Playing/Frameworks",
+					"$(PROJECT_DIR)/Now\\ Playing/Frameworks",
+					"$(PROJECT_DIR)/Now\\ Playing/Frameworks",
+				);
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "Now Playing";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.music";
 				INFOPLIST_KEY_NSAppleEventsUsageDescription = "";
 				INFOPLIST_KEY_NSAppleMusicUsageDescription = "Needed to control the media playback and display the current playing media";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
@@ -281,8 +329,8 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MACOSX_DEPLOYMENT_TARGET = 13.5;
-				MARKETING_VERSION = 1.0;
+				MACOSX_DEPLOYMENT_TARGET = 14.6;
+				MARKETING_VERSION = 1.1;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.rki.Now-Playing";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -329,8 +377,18 @@
 				ENABLE_RESOURCE_ACCESS_PRINTING = NO;
 				ENABLE_RESOURCE_ACCESS_USB = NO;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/Now\\ Playing/mediaremote-adapter/build",
+					"$(PROJECT_DIR)/Now\\ Playing/mediaremote-adapter/build",
+					"$(PROJECT_DIR)/Now\\ Playing/Frameworks",
+					"$(PROJECT_DIR)/Now\\ Playing/Frameworks",
+					"$(PROJECT_DIR)/Now\\ Playing/Frameworks",
+					"$(PROJECT_DIR)/Now\\ Playing/Frameworks",
+				);
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "Now Playing";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.music";
 				INFOPLIST_KEY_NSAppleEventsUsageDescription = "";
 				INFOPLIST_KEY_NSAppleMusicUsageDescription = "Needed to control the media playback and display the current playing media";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
@@ -338,8 +396,8 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MACOSX_DEPLOYMENT_TARGET = 13.5;
-				MARKETING_VERSION = 1.0;
+				MACOSX_DEPLOYMENT_TARGET = 14.6;
+				MARKETING_VERSION = 1.1;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.rki.Now-Playing";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";

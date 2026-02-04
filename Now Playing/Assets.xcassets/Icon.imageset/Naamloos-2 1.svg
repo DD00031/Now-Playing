@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg width="100%" height="100%" viewBox="0 0 512 512" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" xmlns:serif="http://www.serif.com/" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;">
+    <g id="Groep-2" serif:id="Groep 2">
+        <path id="Rechthoek-1" serif:id="Rechthoek 1" d="M160.004,100.969L160.004,411.031C160.004,424.277 149.25,435.031 136.004,435.031L134.996,435.031C121.75,435.031 110.996,424.277 110.996,411.031L110.996,100.969C110.996,87.723 121.75,76.969 134.996,76.969L136.004,76.969C149.25,76.969 160.004,87.723 160.004,100.969Z" style="fill:url(#_Linear1);"/>
+        <path id="Rechthoek-11" serif:id="Rechthoek 1" d="M219.468,141.419L219.468,370.9C219.468,383.617 209.143,393.942 196.426,393.942L193.5,393.942C180.783,393.942 170.458,383.617 170.458,370.9L170.458,141.419C170.458,128.702 180.783,118.377 193.5,118.377L196.426,118.377C209.143,118.377 219.468,128.702 219.468,141.419Z" style="fill:url(#_Linear2);"/>
+        <path id="Rechthoek-1-kopie" serif:id="Rechthoek 1 kopie" d="M279.03,180.728L279.03,329.277C279.03,341.994 268.705,352.319 255.988,352.319L253.032,352.319C240.315,352.319 229.99,341.994 229.99,329.277L229.99,180.728C229.99,168.01 240.315,157.685 253.032,157.685L255.988,157.685C268.705,157.685 279.03,168.01 279.03,180.728Z" style="fill:url(#_Linear3);"/>
+        <path id="Rechthoek-1-kopie-2" serif:id="Rechthoek 1 kopie 2" d="M338.03,220.613L338.03,289.372C338.03,302.089 327.705,312.414 314.988,312.414L312.032,312.414C299.315,312.414 288.99,302.089 288.99,289.372L288.99,220.613C288.99,207.895 299.315,197.57 312.032,197.57L314.988,197.57C327.705,197.57 338.03,207.895 338.03,220.613Z" style="fill:url(#_Linear4);"/>
+        <circle id="Ovaal-1" serif:id="Ovaal 1" cx="369.505" cy="256.505" r="24.505" style="fill:url(#_Linear5);"/>
+    </g>
+    <defs>
+        <linearGradient id="_Linear1" x1="0" y1="0" x2="1" y2="0" gradientUnits="userSpaceOnUse" gradientTransform="matrix(0,-358.062164,358.062164,0,135.5,435.031082)"><stop offset="0" style="stop-color:rgb(254,48,164);stop-opacity:1"/><stop offset="1" style="stop-color:rgb(89,132,214);stop-opacity:1"/></linearGradient>
+        <linearGradient id="_Linear2" x1="0" y1="0" x2="1" y2="0" gradientUnits="userSpaceOnUse" gradientTransform="matrix(0,-275.565125,275.565125,0,194.962865,393.941879)"><stop offset="0" style="stop-color:rgb(254,48,164);stop-opacity:1"/><stop offset="1" style="stop-color:rgb(89,132,214);stop-opacity:1"/></linearGradient>
+        <linearGradient id="_Linear3" x1="0" y1="0" x2="1" y2="0" gradientUnits="userSpaceOnUse" gradientTransform="matrix(0,-194.633386,194.633386,0,254.509746,352.318859)"><stop offset="0" style="stop-color:rgb(254,48,164);stop-opacity:1"/><stop offset="1" style="stop-color:rgb(89,132,214);stop-opacity:1"/></linearGradient>
+        <linearGradient id="_Linear4" x1="0" y1="0" x2="1" y2="0" gradientUnits="userSpaceOnUse" gradientTransform="matrix(0,-114.843288,114.843288,0,313.509746,312.413703)"><stop offset="0" style="stop-color:rgb(254,48,164);stop-opacity:1"/><stop offset="1" style="stop-color:rgb(89,132,214);stop-opacity:1"/></linearGradient>
+        <linearGradient id="_Linear5" x1="0" y1="0" x2="1" y2="0" gradientUnits="userSpaceOnUse" gradientTransform="matrix(0,-49.01,49.01,0,369.505,281.01)"><stop offset="0" style="stop-color:rgb(254,48,164);stop-opacity:1"/><stop offset="1" style="stop-color:rgb(89,132,214);stop-opacity:1"/></linearGradient>
+    </defs>
+</svg>

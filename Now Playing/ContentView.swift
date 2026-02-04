@@ -1,24 +1,37 @@
 import SwiftUI
+import AppKit
 
-// --- ButtonStyle for the bouncy animation ---
 struct ScaleOnTapButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            // Scale down when pressed
             .scaleEffect(configuration.isPressed ? 0.9 : 1.0)
-            // Animate the scale effect with a spring
             .animation(.spring(response: 0.3, dampingFraction: 0.5), value: configuration.isPressed)
     }
 }
 
 struct ContentView: View {
     @StateObject var mediaController = MediaController()
+    @ObservedObject var settings = SettingsManager.shared
     
     // --- View-local state for smooth time updates ---
     @State private var displayTime: Double = 0.0
     @State private var displayTimer: Timer? = nil
     
-    let albumArt = "photo.artframe" // Placeholder
+    // For smooth progress bar updates
+    @State private var smoothProgress: Double = 0.0
+    
+    // --- Dynamic Background State ---
+    @State private var bgStart = UnitPoint.topLeading
+    @State private var bgEnd = UnitPoint.bottomTrailing
+    
+    let albumArt = "photo.artframe"
+    
+    private var gradientColors: [Color] {
+        if !mediaController.mediaInfo.gradientColors.isEmpty {
+            return mediaController.mediaInfo.gradientColors.map { Color(nsColor: $0) }
+        }
+        return [Color.pink, Color.purple]
+    }
     
     private var dominantColor: Color {
         if let nsColor = mediaController.mediaInfo.dominantColor {
@@ -27,179 +40,240 @@ struct ContentView: View {
         return Color.gray
     }
     
+    private var progress: Double {
+        guard mediaController.mediaInfo.totalTime > 0 else { return 0 }
+        return min(displayTime / mediaController.mediaInfo.totalTime, 1.0)
+    }
+    
     var body: some View {
         GeometryReader { geo in
             let size = geo.size
-
-            let artworkSize = min(max(size.width * 0.7, 280), 320) // 70% of width, min 280, max 320
-            let titleFontSize = min(max(size.width * 0.07, 24), 28) // 7% of width, min 24, max 28
-            let artistFontSize = min(max(size.width * 0.045, 16), 20) // min 16, max 20
-            let albumFontSize = min(max(size.width * 0.035, 14), 16) // min 14, max 16
-            let timeFontSize = min(max(size.width * 0.038, 15), 16) // min 15, max 16
-            let buttonFontSize = min(max(size.width * 0.07, 28), 32) // min 28, max 32
-            let playButtonSize = min(max(size.width * 0.175, 70), 80) // min 70, max 80
-            let mainSpacing = min(max(size.height * 0.03, 20), 24) // min 20, max 24
             
             ZStack {
-                // Background gradient
-                LinearGradient(
-                    colors: [
-                        dominantColor.opacity(0.9),
-                        dominantColor.opacity(0.6),
-                        Color.black.opacity(0.9)
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                .ignoresSafeArea()
-                .animation(.easeInOut(duration: 1.0), value: dominantColor)
+                // --- Background Layer with Extracted Gradient ---
+                if settings.useDynamicBackground {
+                    LinearGradient(
+                        colors: gradientColors.map { $0.opacity(0.8) } + [Color.black.opacity(0.9)],
+                        startPoint: bgStart,
+                        endPoint: bgEnd
+                    )
+                    .ignoresSafeArea()
+                    .onAppear {
+                        withAnimation(.easeInOut(duration: 5.0).repeatForever(autoreverses: true)) {
+                            bgStart = .top
+                            bgEnd = .bottom
+                        }
+                    }
+                } else {
+                    LinearGradient(
+                        colors: gradientColors.map { $0.opacity(0.9) } + [Color.black.opacity(0.9)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                    .ignoresSafeArea()
+                }
                 
-                // Blur effect overlay
+                // Blur overlay
                 Rectangle()
                     .fill(.ultraThinMaterial)
                     .ignoresSafeArea()
                 
-                VStack(spacing: mainSpacing) { // Use responsive spacing
-                    Spacer(minLength: 10)
+                // --- Main Content ---
+                VStack(spacing: 0) {
                     
-                    // Album Art
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 16)
-                            .fill(Color.white.opacity(0.1))
-                            .shadow(color: dominantColor.opacity(0.5), radius: 30, x: 0, y: 15)
+                    if settings.isTextMode {
+                        // --- TEXT MODE UI ---
+                        VStack(spacing: 4) {
+                            Spacer()
+                            MarqueeText(
+                                content: mediaController.mediaInfo.title,
+                                font: .systemFont(ofSize: 16, weight: .bold)
+                            )
+                            .foregroundColor(.white)
+                            
+                            MarqueeText(
+                                content: mediaController.mediaInfo.artist,
+                                font: .systemFont(ofSize: 13, weight: .medium)
+                            )
+                            .foregroundColor(.white.opacity(0.8))
+                            Spacer()
+                        }
+                        .padding(.horizontal, 10)
                         
-                        // --- Inner ZStack for fade animation ---
+                    } else {
+                        // --- NORMAL MODE UI ---
+                        Spacer()
+                        
+                        // Album Art
+                        let artworkSize = min(max(size.width * 0.7, 200), 320)
                         ZStack {
+                            RoundedRectangle(cornerRadius: 16)
+                                .fill(Color.white.opacity(0.1))
+                                .shadow(color: gradientColors.first?.opacity(0.5) ?? .clear, radius: 30, x: 0, y: 15)
+                            
                             if let art = mediaController.mediaInfo.artwork {
                                 Image(nsImage: art)
                                     .resizable()
                                     .aspectRatio(contentMode: .fill)
                                     .transition(.opacity)
-                                    // Use title as ID to force transition on change
                                     .id(mediaController.mediaInfo.title)
                             } else {
-                                // Placeholder
-                                Image(systemName: albumArt)
+                                Image("Icon")
                                     .resizable()
                                     .aspectRatio(contentMode: .fit)
-                                    .frame(width: artworkSize * 0.8, height: artworkSize * 0.8) // Scale placeholder
-                                    .foregroundStyle(
-                                        LinearGradient(
-                                            colors: [dominantColor.opacity(0.8), dominantColor.opacity(0.5)],
-                                            startPoint: .topLeading,
-                                            endPoint: .bottomTrailing
-                                        )
-                                    )
-                                    .transition(.opacity)
-                                    .id("placeholder") // ID for placeholder
+                                    .frame(width: artworkSize * 0.6)
+                                    .foregroundStyle(.white.opacity(0.5))
                             }
                         }
-                        // --- Animate when artwork (which is optional) changes ---
-                        .animation(.easeInOut(duration: 0.75), value: mediaController.mediaInfo.artwork)
-                        .frame(width: artworkSize, height: artworkSize) // Apply frame to inner ZStack
+                        .frame(width: artworkSize, height: artworkSize)
                         .clipShape(RoundedRectangle(cornerRadius: 16))
+                        .animation(.easeInOut, value: mediaController.mediaInfo.artwork)
                         
-                    }
-                    .frame(width: artworkSize, height: artworkSize) // Apply frame to outer ZStack
-                    
-                    // --- Song Info now uses MarqueeText ---
-                    VStack(spacing: 8) {
-                        MarqueeText(
-                            content: mediaController.mediaInfo.title,
-                            font: .systemFont(ofSize: titleFontSize, weight: .semibold)
-                        )
-                        .foregroundColor(.white)
+                        Spacer().frame(height: 30)
                         
-                        MarqueeText(
-                            content: mediaController.mediaInfo.artist,
-                            font: .systemFont(ofSize: artistFontSize, weight: .regular)
-                        )
-                        .foregroundColor(.white.opacity(0.7))
-
-                        MarqueeText(
-                            content: mediaController.mediaInfo.album,
-                            font: .systemFont(ofSize: albumFontSize, weight: .regular)
-                        )
-                        .foregroundColor(.white.opacity(0.5))
-                    }
-                    // --- Widen padding ---
-                    .padding(.horizontal, 20)
-                    
-                    // --- Use local displayTime ---
-                    Text("\(formatTime(displayTime)) / \(formatTime(mediaController.mediaInfo.totalTime))")
-                        .font(.system(size: timeFontSize, weight: .medium, design: .monospaced))
-                        .foregroundColor(.white.opacity(0.8))
-                    
-                    // Playback Controls - Responsive
-                    HStack(spacing: 50) {
-                        // Previous Button
-                        Button(action: mediaController.prevTrack) {
-                            Image(systemName: "backward.fill")
-                                .font(.system(size: buttonFontSize))
-                                .foregroundColor(.white)
+                        // Text Info
+                        VStack(spacing: 6) {
+                            MarqueeText(
+                                content: mediaController.mediaInfo.title,
+                                font: .systemFont(ofSize: 22, weight: .semibold)
+                            )
+                            .foregroundColor(.white)
+                            
+                            MarqueeText(
+                                content: mediaController.mediaInfo.artist,
+                                font: .systemFont(ofSize: 16, weight: .regular)
+                            )
+                            .foregroundColor(.white.opacity(0.7))
                         }
-                        .buttonStyle(ScaleOnTapButtonStyle()) // --- Apply animation
+                        .padding(.horizontal, 20)
                         
-                        // Play/Pause Button
-                        Button(action: mediaController.togglePlayPause) {
-                            ZStack {
-                                Circle()
-                                    .fill(Color.white.opacity(0.2))
-                                    .frame(width: playButtonSize, height: playButtonSize) // Responsive size
+                        Spacer().frame(height: 20)
+                        
+                        // Progress Bar or Time Display
+                        if settings.showProgressBar {
+                            VStack(spacing: 8) {
+                                // Draggable Progress Bar
+                                DraggableProgressBar(
+                                    progress: smoothProgress,
+                                    gradientColors: [Color.white,dominantColor],
+                                    onSeek: { newProgress in
+                                        let seekTime = newProgress * mediaController.mediaInfo.totalTime
+                                        mediaController.seek(to: seekTime)
+                                        displayTime = seekTime
+                                    }
+                                )
+                                .frame(height: 6)
+                                .padding(.horizontal, geo.size.width*0.06)
+                                .frame(maxWidth: 1300)
                                 
-                                Image(systemName: mediaController.mediaInfo.isPlaying ? "pause.fill" : "play.fill")
-                                    .font(.system(size: buttonFontSize)) // Responsive icon
-                                    .foregroundColor(.white)
-                                    .offset(x: mediaController.mediaInfo.isPlaying ? 0 : 2)
+                                // Time labels
+                                HStack {
+                                    Text(formatTime(displayTime))
+                                        .font(.system(size: 12, weight: .medium, design: .monospaced))
+                                        .foregroundColor(.white.opacity(0.6))
+                                    
+                                    Spacer()
+                                    
+                                    Text(formatTime(mediaController.mediaInfo.totalTime))
+                                        .font(.system(size: 12, weight: .medium, design: .monospaced))
+                                        .foregroundColor(.white.opacity(0.6))
+                                }
+                                .padding(.horizontal, geo.size.width*0.06)
+                                .frame(maxWidth: 1300)
+                            }
+                        } else {
+                            // Time only display
+                            Text("\(formatTime(displayTime)) / \(formatTime(mediaController.mediaInfo.totalTime))")
+                                .font(.system(size: 14, weight: .medium, design: .monospaced))
+                                .foregroundColor(.white.opacity(0.6))
+                        }
+                        
+                        Spacer().frame(height: 30)
+                        
+                        // Controls
+                        HStack(spacing: 40) {
+                            ControlBtn(icon: "backward.fill") {
+                                mediaController.prevTrack()
+                            }
+                            
+                            Button {
+                                mediaController.togglePlayPause()
+                            } label: {
+                                ZStack {
+                                    Circle()
+                                        .fill(.gray)
+                                        .frame(width: 60, height: 60)
+                                        .opacity(0.15)
+                                        .shadow(color: gradientColors.first?.opacity(0.5) ?? .clear, radius: 4, x: 0, y: 0)
+
+                                    Image(systemName: mediaController.mediaInfo.isPlaying ? "pause.fill" : "play.fill")
+                                        .font(.system(size: 24))
+                                        .foregroundColor(.white)
+                                }
+                            }
+                            .buttonStyle(ScaleOnTapButtonStyle())
+
+                            ControlBtn(icon: "forward.fill") {
+                                mediaController.nextTrack()
                             }
                         }
-                        .buttonStyle(ScaleOnTapButtonStyle()) // --- Apply animation
                         
-                        // Next Button
-                        Button(action: mediaController.nextTrack) {
-                            Image(systemName: "forward.fill")
-                                .font(.system(size: buttonFontSize))
-                                .foregroundColor(.white)
-                        }
-                        .buttonStyle(ScaleOnTapButtonStyle()) // --- Apply animation
+                        Spacer()
                     }
-                    
-                    Spacer(minLength: 10) // Use minLength Spacer
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-
-                .padding(.horizontal, max(size.width * 0.05, 20)) // Responsive horizontal padding
             }
         }
-        .frame(minWidth: 320, minHeight: 650) // Min height is 650
-        // --- Timer logic for smooth time display ---
+        // --- Window Resizing Logic ---
+        .onChange(of: settings.isTextMode) { isText in
+            if let window = NSApp.windows.first {
+                var frame = window.frame
+                if isText {
+                    // Shrink
+                    frame.size = CGSize(width: 300, height: 100)
+                } else {
+                    // Restore
+                    frame.size = CGSize(width: 350, height: 600)
+                }
+                window.setFrame(frame, display: true, animate: true)
+            }
+        }
+        .frame(minWidth: settings.isTextMode ? 250 : 320,
+               minHeight: settings.isTextMode ? 80 : 600)
+        // --- Timer logic ---
         .onAppear {
-            // Sync time on appear
             displayTime = mediaController.mediaInfo.currentTime
-            // Start timer if playing
+            smoothProgress = progress
             startDisplayTimer(if: mediaController.mediaInfo.isPlaying)
         }
         .onDisappear {
-            // Clean up timer
             displayTimer?.invalidate()
         }
         .onChange(of: mediaController.mediaInfo.currentTime) {
-            // Sync displayTime when the model updates (e.g., new song)
             displayTime = mediaController.mediaInfo.currentTime
+            withAnimation(.linear(duration: 0.3)) {
+                smoothProgress = progress
+            }
         }
         .onChange(of: mediaController.mediaInfo.isPlaying) { isPlaying in
-            // Start/stop the timer when play state changes
             startDisplayTimer(if: isPlaying)
+        }
+        .onChange(of: progress) { newProgress in
+            if mediaController.mediaInfo.isPlaying {
+                withAnimation(.linear(duration: 0.5)) {
+                    smoothProgress = newProgress
+                }
+            } else {
+                smoothProgress = newProgress
+            }
         }
     }
     
-    // --- Helper function to manage the view's timer ---
+    // --- Helpers ---
     private func startDisplayTimer(if isPlaying: Bool) {
         displayTimer?.invalidate()
         if isPlaying {
-            displayTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
-                // Only increment here. Syncing happens in .onChange
-                displayTime += 1.0
+            displayTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
+                displayTime += 0.1
             }
         }
     }
@@ -211,6 +285,96 @@ struct ContentView: View {
     }
 }
 
+// MARK: - Draggable Progress Bar
+struct DraggableProgressBar: View {
+    let progress: Double
+    let gradientColors: [Color]
+    let onSeek: (Double) -> Void
+    
+    @State private var isDragging = false
+    @State private var dragProgress: Double?
+    
+    private var displayProgress: Double {
+        isDragging ? (dragProgress ?? progress) : progress
+    }
+    
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack(alignment: .leading) {
+                // Background track
+                Capsule()
+                    .fill(.ultraThinMaterial)
+                    .overlay(
+                        Capsule()
+                            .strokeBorder(.white.opacity(0.1), lineWidth: 0.5)
+                    )
+                
+                // Progress fill
+                Capsule()
+                    .fill(
+                        LinearGradient(
+                            colors: gradientColors.isEmpty ?
+                                [.white.opacity(0.9), .gray.opacity(0.8)] :
+                                gradientColors.map { $0.opacity(0.9) },
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .frame(width: geometry.size.width * displayProgress)
+                    .shadow(color: gradientColors.first?.opacity(0.5) ?? .clear, radius: 4, x: 0, y: 0)
+                
+                // Thumb (only visible when dragging or hovering)
+                if isDragging {
+                    Circle()
+                        .fill(.white)
+                        .frame(width: 14, height: 14)
+                        .shadow(color: .black.opacity(0.3), radius: 4, x: 0, y: 2)
+                        .offset(x: geometry.size.width * displayProgress - 7)
+                }
+            }
+            .contentShape(Rectangle()) // Make entire area tappable
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { value in
+                        isDragging = true
+                        let newProgress = max(0, min(1, value.location.x / geometry.size.width))
+                        dragProgress = newProgress
+                    }
+                    .onEnded { value in
+                        let finalProgress = max(0, min(1, value.location.x / geometry.size.width))
+                        onSeek(finalProgress)
+                        isDragging = false
+                        dragProgress = nil
+                    }
+            )
+        }
+    }
+}
+
+struct ControlBtn: View {
+    let icon: String
+    let action: () -> Void
+    @State private var isHovered = false
+    
+    var body: some View {
+        Button {
+            action()
+        } label: {
+            ZStack {
+                Image(systemName: icon)
+                    .font(.system(size: 20))
+                    .foregroundColor(.white)
+            }
+        }
+        .buttonStyle(ScaleOnTapButtonStyle())
+        .onHover { hovering in
+            withAnimation(.easeInOut(duration: 0.2)) {
+                isHovered = hovering
+            }
+        }
+    }
+}
+
 // --- MarqueeText View ---
 struct MarqueeText: View {
     let content: String
@@ -218,101 +382,53 @@ struct MarqueeText: View {
     
     @State private var textWidth: CGFloat = 0
     @State private var animate = false
-    
     private let spacing: CGFloat = 40
 
     var body: some View {
-        // --- Set a slower, fixed speed (40 pixels per second) ---
-        // Duration = Distance / Speed
         let duration = (textWidth + spacing) / 40
-        
-        // This is the view that will be displayed
-        let textView = Text(content)
-            .font(Font(font))
-            .lineLimit(1)
-            .fixedSize()
+        let textView = Text(content).font(Font(font)).lineLimit(1).fixedSize()
 
-        // This ZStack will hold everything.
-        // It's in a GeometryReader to get the container width.
         GeometryReader { geometry in
             let containerWidth = geometry.size.width
             let shouldAnimate = textWidth > containerWidth
             
-            // This ZStack is for alignment.
-            // It centers the content if it's not animating.
             ZStack(alignment: .center) {
                 if shouldAnimate {
-                    // The animating HStack
-                    HStack(spacing: spacing) {
-                        textView
-                        textView
-                    }
-                    .offset(x: animate ? -(textWidth + spacing) : 0)
-                    .animation(
-                        animate ?
-                        // --- MODIFIED: Longer delay (3.0s) and new duration ---
-                        Animation.linear(duration: duration).delay(3.0).repeatForever(autoreverses: false)
-                        : .default,
-                        value: animate
-                    )
-                    // This frame is *crucial*. It makes the HStack
-                    // start at the leading edge for the offset to work.
-                    .frame(minWidth: containerWidth, alignment: .leading)
-                    
+                    HStack(spacing: spacing) { textView; textView }
+                        .offset(x: animate ? -(textWidth + spacing) : 0)
+                        .animation(
+                            animate ? Animation.linear(duration: duration).delay(3.0).repeatForever(autoreverses: false) : .default,
+                            value: animate
+                        )
+                        .frame(minWidth: containerWidth, alignment: .leading)
                 } else {
-                    // The static, centered text
                     textView
                 }
             }
-            .frame(width: containerWidth) // Center the ZStack
+            .frame(width: containerWidth)
             .onAppear {
                 self.textWidth = content.width(usingFont: font)
                 self.animate = self.textWidth > containerWidth
             }
             .onChange(of: content) {
-                self.animate = false // Reset animation
+                self.animate = false
                 self.textWidth = content.width(usingFont: font)
-                DispatchQueue.main.async { // Allow state to reset
-                    self.animate = self.textWidth > containerWidth
-                }
+                DispatchQueue.main.async { self.animate = self.textWidth > containerWidth }
             }
             .onChange(of: geometry.size.width) {
-                self.animate = false // Reset animation
-                DispatchQueue.main.async { // Allow state to reset
-                    self.animate = self.textWidth > containerWidth
-                }
+                self.animate = false
+                DispatchQueue.main.async { self.animate = self.textWidth > containerWidth }
             }
         }
         .frame(height: font.pointSize * 1.5)
-        .clipped() // Clip everything
+        .clipped()
     }
 }
 
-
-// Helper to get text width
 extension String {
     func width(usingFont font: NSFont) -> CGFloat {
         let fontAttributes = [NSAttributedString.Key.font: font]
         let size = self.size(withAttributes: fontAttributes)
         return size.width
-    }
-}
-
-// Preview with color scheme options
-struct ContentView_Previews: PreviewProvider {
-    static var previews: some View {
-        ContentView()
-    }
-}
-
-// App Entry Point
-@main
-struct NowPlayingApp: App {
-    var body: some Scene {
-        WindowGroup {
-            ContentView()
-        }
-        .windowStyle(.hiddenTitleBar)
-        .windowResizability(.contentSize)
     }
 }
