@@ -31,6 +31,9 @@ class MediaController: ObservableObject {
     private var artworkCache = [String: NSImage]()
     private var currentArtworkTask: URLSessionDataTask?
     
+    // Track last known source to detect switches
+    private var lastKnownSource: String = ""
+    
     // --- Scripts ---
     private let musicScript = """
     try
@@ -112,11 +115,13 @@ class MediaController: ObservableObject {
     
     private func fetchMediaInfo() {
         var foundActivePlayer = false
+        var newSource = ""
         
         // Mode 1: All Media (MediaRemote Adapter)
         if settings.retrievalMode == 1 {
             if fetchMediaRemote() {
                 foundActivePlayer = true
+                newSource = "MediaRemote"
             }
         }
         // Mode 0: Priority List (Music Players)
@@ -126,24 +131,50 @@ class MediaController: ObservableObject {
             for player in players {
                 if foundActivePlayer { break }
                 
+                // Skip disabled players
                 if !settings.isPlayerEnabled(player) { continue }
                 
                 switch player {
                 case "Foobar2000":
-                    if readFoobarFile() { foundActivePlayer = true }
+                    if readFoobarFile() {
+                        foundActivePlayer = true
+                        newSource = "Foobar2000"
+                    }
                 case "Spotify":
-                    if runAppleScript(script: spotifyScript, parse: true, sourceName: "Spotify") { foundActivePlayer = true }
+                    if runAppleScript(script: spotifyScript, parse: true, sourceName: "Spotify") {
+                        foundActivePlayer = true
+                        newSource = "Spotify"
+                    }
                 case "Apple Music":
-                    if runAppleScript(script: musicScript, parse: true, sourceName: "Apple Music") { foundActivePlayer = true }
+                    if runAppleScript(script: musicScript, parse: true, sourceName: "Apple Music") {
+                        foundActivePlayer = true
+                        newSource = "Apple Music"
+                    }
                 default:
                     break
                 }
             }
         }
         
+        // Detect source switch and force artwork reload
+        if newSource != lastKnownSource && !newSource.isEmpty {
+            print("Source switched from \(lastKnownSource) to \(newSource) - forcing artwork reload")
+            lastKnownSource = newSource
+            // Clear current artwork to force reload
+            DispatchQueue.main.async {
+                if self.mediaInfo.source != newSource {
+                    self.mediaInfo.artwork = nil
+                    self.mediaInfo.gradientColors = []
+                    self.mediaInfo.dominantColor = nil
+                }
+            }
+        }
+        
         if !foundActivePlayer {
             DispatchQueue.main.async {
+                // Only reset if we aren't already blank
                 if self.mediaInfo.title != "Nothing Playing" {
+                    self.lastKnownSource = ""
                     self.updateMediaInfo(with: MediaInfo())
                 }
             }
@@ -160,12 +191,10 @@ class MediaController: ObservableObject {
         // 1. Locate the Perl script in Resources
         guard let scriptPath = Bundle.main.path(forResource: "mediaremote-adapter", ofType: "pl") else {
             print("ERROR: mediaremote-adapter.pl not found in Bundle Resources.")
-            print("Expected location: \(Bundle.main.resourcePath ?? "unknown")/mediaremote-adapter.pl")
             return false
         }
         
         // 2. The framework path should ALWAYS end at .framework
-        // The Perl script expects this and will look for the binary inside
         let frameworkPath = Bundle.main.bundlePath + "/Contents/Frameworks/MediaRemoteAdapter.framework"
         
         // Verify framework directory exists
@@ -174,7 +203,7 @@ class MediaController: ObservableObject {
             return false
         }
         
-        // Verify the binary exists (either flat or versioned structure)
+        // Verify the binary exists
         let flatBinaryPath = frameworkPath + "/MediaRemoteAdapter"
         let versionedBinaryPath = frameworkPath + "/Versions/A/MediaRemoteAdapter"
         
@@ -183,13 +212,8 @@ class MediaController: ObservableObject {
         
         if !binaryExists {
             print("ERROR: MediaRemoteAdapter binary not found")
-            print("Checked: \(flatBinaryPath)")
-            print("Checked: \(versionedBinaryPath)")
             return false
         }
-        
-        print("MediaRemote: Using script at: \(scriptPath)")
-        print("MediaRemote: Using framework at: \(frameworkPath)")
 
         // 3. Setup Process
         let task = Process()
@@ -217,25 +241,14 @@ class MediaController: ObservableObject {
                 return false
             }
             
-            // Debug: Print raw output
-            if let rawOutput = String(data: data, encoding: .utf8) {
-                print("MediaRemote raw output: \(rawOutput)")
-            }
-            
             // 4. Parse JSON output
             guard let json = try? JSONSerialization.jsonObject(with: data, options: []) as? [String: Any] else {
                 print("ERROR: Failed to parse JSON from mediaremote-adapter")
-                if let rawOutput = String(data: data, encoding: .utf8) {
-                    print("Raw output was: \(rawOutput)")
-                }
                 return false
             }
             
-            print("MediaRemote JSON parsed successfully: \(json)")
-            
             // Check if we have valid media info
             guard let title = json["title"] as? String, !title.isEmpty else {
-                print("MediaRemote: No title found or empty, nothing playing")
                 return false
             }
             
@@ -246,7 +259,7 @@ class MediaController: ObservableObject {
             let elapsedTime = json["elapsedTime"] as? Double ?? 0.0
             let timestamp = json["timestamp"] as? Double ?? Date().timeIntervalSince1970
             
-            // Calculate precise current time based on timestamp diff if playing
+            // Calculate precise current time
             var currentCalc = elapsedTime
             if isPlaying {
                 let diff = Date().timeIntervalSince1970 - timestamp
@@ -259,13 +272,6 @@ class MediaController: ObservableObject {
                !artworkBase64.isEmpty,
                let artworkData = Data(base64Encoded: artworkBase64) {
                 fetchedImage = NSImage(data: artworkData)
-                if fetchedImage != nil {
-                    print("MediaRemote: Successfully decoded artwork")
-                } else {
-                    print("MediaRemote: Failed to create NSImage from artwork data")
-                }
-            } else {
-                print("MediaRemote: No artwork data in response")
             }
             
             let newInfo = MediaInfo(
@@ -280,8 +286,6 @@ class MediaController: ObservableObject {
                 gradientColors: [],
                 source: "MediaRemote"
             )
-            
-            print("MediaRemote: Successfully fetched media info - \(title) by \(artist)")
             
             DispatchQueue.main.async {
                 self.updateMediaInfo(with: newInfo, directImage: fetchedImage)
@@ -368,22 +372,26 @@ class MediaController: ObservableObject {
     // --- UI Update & Timer Logic ---
     private func updateMediaInfo(with newInfo: MediaInfo, artworkData: String = "", directImage: NSImage? = nil) {
         let titleChanged = (newInfo.title != self.mediaInfo.title || newInfo.artist != self.mediaInfo.artist)
+        let sourceChanged = (newInfo.source != self.mediaInfo.source)
         
-        // Artwork Handling
-        if titleChanged {
+        // Artwork Handling - Force reload on source change
+        if titleChanged || sourceChanged {
             if let image = directImage {
                 // If we got an image directly (MediaRemote), use it immediately
-                self.mediaInfo.artwork = image
                 let colors = image.extractGradientColors()
+                self.mediaInfo.artwork = image
                 self.mediaInfo.gradientColors = colors
-                self.mediaInfo.dominantColor = image.averageColor()
+                self.mediaInfo.dominantColor = colors.first
                 artworkCache[newInfo.title] = image
             } else if !artworkData.isEmpty {
-                // If we got a URL/Path (AppleScript), fetch it
-                self.mediaInfo.artwork = nil
-                self.mediaInfo.dominantColor = nil
-                self.mediaInfo.gradientColors = []
-                loadArtwork(from: artworkData, cacheKey: newInfo.title)
+                // If we got a URL/Path (AppleScript/Foobar), fetch it
+                // Clear current artwork immediately to prevent flash
+                if sourceChanged {
+                    self.mediaInfo.artwork = nil
+                    self.mediaInfo.gradientColors = []
+                    self.mediaInfo.dominantColor = nil
+                }
+                loadArtwork(from: artworkData, cacheKey: newInfo.title, forceReload: sourceChanged)
             } else {
                 // No art
                 self.mediaInfo.artwork = nil
@@ -393,10 +401,10 @@ class MediaController: ObservableObject {
         } else if directImage != nil {
              // Ensure existing art matches if we are refreshing via MediaRemote
              if self.mediaInfo.artwork == nil {
-                 self.mediaInfo.artwork = directImage
                  let colors = directImage!.extractGradientColors()
+                 self.mediaInfo.artwork = directImage
                  self.mediaInfo.gradientColors = colors
-                 self.mediaInfo.dominantColor = directImage?.averageColor()
+                 self.mediaInfo.dominantColor = colors.first
              }
         }
         
@@ -427,18 +435,18 @@ class MediaController: ObservableObject {
     }
     
     // --- Artwork Functions ---
-    private func loadArtwork(from data: String, cacheKey: String) {
+    private func loadArtwork(from data: String, cacheKey: String, forceReload: Bool = false) {
         currentArtworkTask?.cancel()
         
         if cacheKey.isEmpty || cacheKey == "Nothing Playing" { return }
         
-        if let cachedImage = artworkCache[cacheKey] {
+        // Check cache first, but skip if force reload (source changed)
+        if !forceReload, let cachedImage = artworkCache[cacheKey] {
             let colors = cachedImage.extractGradientColors()
-            let avgColor = cachedImage.averageColor()
             DispatchQueue.main.async {
                 self.mediaInfo.artwork = cachedImage
                 self.mediaInfo.gradientColors = colors
-                self.mediaInfo.dominantColor = avgColor
+                self.mediaInfo.dominantColor = colors.first
             }
             return
         }
@@ -448,13 +456,12 @@ class MediaController: ObservableObject {
             currentArtworkTask = URLSession.shared.dataTask(with: url) { [weak self] (data, response, error) in
                 guard let self = self, let data = data, error == nil, let image = NSImage(data: data) else { return }
                 let colors = image.extractGradientColors()
-                let avgColor = image.averageColor()
                 DispatchQueue.main.async {
                     self.artworkCache[cacheKey] = image
                     if self.mediaInfo.title == cacheKey {
                         self.mediaInfo.artwork = image
                         self.mediaInfo.gradientColors = colors
-                        self.mediaInfo.dominantColor = avgColor
+                        self.mediaInfo.dominantColor = colors.first
                     }
                 }
             }
@@ -465,13 +472,12 @@ class MediaController: ObservableObject {
                 if let imageData = try? Data(contentsOf: URL(fileURLWithPath: data), options: .uncachedRead),
                    let image = NSImage(data: imageData) {
                     let colors = image.extractGradientColors()
-                    let avgColor = image.averageColor()
                     DispatchQueue.main.async {
                         self.artworkCache[cacheKey] = image
                         if self.mediaInfo.title == cacheKey {
                             self.mediaInfo.artwork = image
                             self.mediaInfo.gradientColors = colors
-                            self.mediaInfo.dominantColor = avgColor
+                            self.mediaInfo.dominantColor = colors.first
                         }
                     }
                 }
@@ -502,13 +508,12 @@ class MediaController: ObservableObject {
                 let artworkData = result.data
                 if !artworkData.isEmpty, let image = NSImage(data: artworkData) {
                     let colors = image.extractGradientColors()
-                    let avgColor = image.averageColor()
                     DispatchQueue.main.async {
                         self.artworkCache[cacheKey] = image
                         if self.mediaInfo.title == cacheKey {
                             self.mediaInfo.artwork = image
                             self.mediaInfo.gradientColors = colors
-                            self.mediaInfo.dominantColor = avgColor
+                            self.mediaInfo.dominantColor = colors.first
                         }
                     }
                 }
@@ -518,56 +523,74 @@ class MediaController: ObservableObject {
     
     // --- Playback Controls ---
     func togglePlayPause() {
-        // Try media keys first
-        if !pressMediaKey(16) { // NX_KEYTYPE_PLAY
-            // Fallback to AppleScript if media keys don't work
-            sendPlayPauseCommand()
+        // In Music Players mode, try to control the current source directly
+        if settings.retrievalMode == 0 && !mediaInfo.source.isEmpty {
+            sendPlayPauseToSource(mediaInfo.source)
+        } else {
+            // Try media keys first
+            if !pressMediaKey(16) {
+                sendPlayPauseCommand()
+            }
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { self.refreshMediaInfo() }
     }
     
     func nextTrack() {
-        if !pressMediaKey(17) { // NX_KEYTYPE_NEXT
-            sendNextCommand()
+        // In Music Players mode, try to control the current source directly
+        if settings.retrievalMode == 0 && !mediaInfo.source.isEmpty {
+            sendNextToSource(mediaInfo.source)
+        } else {
+            if !pressMediaKey(17) {
+                sendNextCommand()
+            }
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { self.refreshMediaInfo() }
     }
     
     func prevTrack() {
-        if !pressMediaKey(18) { // NX_KEYTYPE_PREVIOUS
-            sendPreviousCommand()
+        // In Music Players mode, try to control the current source directly
+        if settings.retrievalMode == 0 && !mediaInfo.source.isEmpty {
+            sendPreviousToSource(mediaInfo.source)
+        } else {
+            if !pressMediaKey(18) {
+                sendPreviousCommand()
+            }
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { self.refreshMediaInfo() }
     }
     
     func seek(to time: Double) {
-        // Clamp to valid range
-        let seekTime = max(0, min(time, mediaInfo.totalTime))
-        
-        // Try AppleScript seeking
-        let script = """
-        if application "Spotify" is running then
-            tell application "Spotify"
-                try
-                    set player position to \(seekTime)
-                end try
-            end tell
-        else if application "Music" is running then
-            tell application "Music"
-                try
-                    set player position to \(seekTime)
-                end try
-            end tell
-        end if
-        """
-        
-        // Update display immediately for responsiveness
-        DispatchQueue.main.async {
-            self.mediaInfo.currentTime = seekTime
+        // Seeking only works with Apple Music and Spotify
+        if mediaInfo.source == "Apple Music" || mediaInfo.source == "Spotify" {
+            let seekTime = max(0, min(time, mediaInfo.totalTime))
+            
+            let script: String
+            if mediaInfo.source == "Spotify" {
+                script = """
+                tell application "Spotify"
+                    try
+                        set player position to \(seekTime)
+                    end try
+                end tell
+                """
+            } else { // Apple Music
+                script = """
+                tell application "Music"
+                    try
+                        set player position to \(seekTime)
+                    end try
+                end tell
+                """
+            }
+            
+            // Update display immediately for responsiveness
+            DispatchQueue.main.async {
+                self.mediaInfo.currentTime = seekTime
+            }
+            
+            _ = runAppleScript(script: script, parse: false)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { self.refreshMediaInfo() }
         }
-        
-        _ = runAppleScript(script: script, parse: false)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { self.refreshMediaInfo() }
     }
 
     @discardableResult
@@ -599,6 +622,50 @@ class MediaController: ObservableObject {
         eventDown.cgEvent?.post(tap: .cgSessionEventTap)
         eventUp.cgEvent?.post(tap: .cgSessionEventTap)
         return true
+    }
+    
+    // --- Source-Specific Controls ---
+    private func sendPlayPauseToSource(_ source: String) {
+        let script: String
+        switch source {
+        case "Spotify":
+            script = "tell application \"Spotify\" to playpause"
+        case "Apple Music":
+            script = "tell application \"Music\" to playpause"
+        default:
+            // For Foobar or others, fall back to media keys
+            _ = pressMediaKey(16)
+            return
+        }
+        _ = runAppleScript(script: script, parse: false)
+    }
+    
+    private func sendNextToSource(_ source: String) {
+        let script: String
+        switch source {
+        case "Spotify":
+            script = "tell application \"Spotify\" to next track"
+        case "Apple Music":
+            script = "tell application \"Music\" to next track"
+        default:
+            _ = pressMediaKey(17)
+            return
+        }
+        _ = runAppleScript(script: script, parse: false)
+    }
+    
+    private func sendPreviousToSource(_ source: String) {
+        let script: String
+        switch source {
+        case "Spotify":
+            script = "tell application \"Spotify\" to previous track"
+        case "Apple Music":
+            script = "tell application \"Music\" to previous track"
+        default:
+            _ = pressMediaKey(18)
+            return
+        }
+        _ = runAppleScript(script: script, parse: false)
     }
     
     // --- AppleScript Fallback Controls ---
@@ -730,23 +797,5 @@ extension NSImage {
             brightness = min(brightness * 1.1, 1.0)
             return NSColor(hue: hue, saturation: saturation, brightness: brightness, alpha: alpha)
         }
-    }
-}
-extension NSImage {
-    func averageColor() -> NSColor? {
-        guard let cgImage = self.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return nil }
-        let inputImage = CIImage(cgImage: cgImage)
-        let extentVector = CIVector(x: inputImage.extent.origin.x, y: inputImage.extent.origin.y, z: inputImage.extent.size.width, w: inputImage.extent.size.height)
-        guard let filter = CIFilter(name: "CIAreaAverage", parameters: [kCIInputImageKey: inputImage, kCIInputExtentKey: extentVector]) else { return nil }
-        guard let outputImage = filter.outputImage else { return nil }
-        var bitmap = [UInt8](repeating: 0, count: 4)
-        let context = CIContext(options: [.workingColorSpace: kCFNull!])
-        context.render(outputImage, toBitmap: &bitmap, rowBytes: 4, bounds: CGRect(x: 0, y: 0, width: 1, height: 1), format: .RGBA8, colorSpace: nil)
-        let avgColor = NSColor(red: CGFloat(bitmap[0]) / 255.0, green: CGFloat(bitmap[1]) / 255.0, blue: CGFloat(bitmap[2]) / 255.0, alpha: CGFloat(bitmap[3]) / 255.0)
-        var hue: CGFloat = 0, saturation: CGFloat = 0, brightness: CGFloat = 0, alpha: CGFloat = 0
-        avgColor.getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: &alpha)
-        saturation = min(saturation * 1.4, 1.0)
-        brightness = min(brightness * 1.2, 1.0)
-        return NSColor(hue: hue, saturation: saturation, brightness: brightness, alpha: alpha)
     }
 }

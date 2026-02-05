@@ -24,11 +24,24 @@ struct ContentView: View {
     @State private var bgStart = UnitPoint.topLeading
     @State private var bgEnd = UnitPoint.bottomTrailing
     
+    // Keep track of last gradient to prevent flashing
+    @State private var lastGradientColors: [Color] = []
+    @State private var fallbackTimer: Timer?
+    @State private var shouldShowFallback = false
+    
     let albumArt = "photo.artframe"
     
     private var gradientColors: [Color] {
         if !mediaController.mediaInfo.gradientColors.isEmpty {
             return mediaController.mediaInfo.gradientColors.map { Color(nsColor: $0) }
+        }
+        // If nothing is playing and we should show fallback, use pink/purple
+        if shouldShowFallback || mediaController.mediaInfo.title == "Nothing Playing" {
+            return [Color.pink, Color.purple]
+        }
+        // Otherwise keep last known colors
+        if !lastGradientColors.isEmpty {
+            return lastGradientColors
         }
         return [Color.pink, Color.purple]
     }
@@ -140,7 +153,7 @@ struct ContentView: View {
                             .foregroundColor(.white)
                             
                             MarqueeText(
-                                content: mediaController.mediaInfo.artist,
+                                content: mediaController.mediaInfo.artist + "   -   " + mediaController.mediaInfo.album,
                                 font: .systemFont(ofSize: 16, weight: .regular)
                             )
                             .foregroundColor(.white.opacity(0.7))
@@ -155,7 +168,7 @@ struct ContentView: View {
                                 // Draggable Progress Bar
                                 DraggableProgressBar(
                                     progress: smoothProgress,
-                                    gradientColors: [Color.white,dominantColor],
+                                    gradientColors: [Color.white, dominantColor],
                                     onSeek: { newProgress in
                                         let seekTime = newProgress * mediaController.mediaInfo.totalTime
                                         mediaController.seek(to: seekTime)
@@ -212,7 +225,7 @@ struct ContentView: View {
                                 }
                             }
                             .buttonStyle(ScaleOnTapButtonStyle())
-
+                            
                             ControlBtn(icon: "forward.fill") {
                                 mediaController.nextTrack()
                             }
@@ -247,6 +260,7 @@ struct ContentView: View {
         }
         .onDisappear {
             displayTimer?.invalidate()
+            fallbackTimer?.invalidate()
         }
         .onChange(of: mediaController.mediaInfo.currentTime) {
             displayTime = mediaController.mediaInfo.currentTime
@@ -264,6 +278,33 @@ struct ContentView: View {
                 }
             } else {
                 smoothProgress = newProgress
+            }
+        }
+        .onChange(of: mediaController.mediaInfo.gradientColors) { newColors in
+            // Update last gradient colors when we have valid ones (prevents flash)
+            if !newColors.isEmpty {
+                // Cancel fallback timer since we have new colors
+                fallbackTimer?.invalidate()
+                shouldShowFallback = false
+                
+                withAnimation(.easeInOut(duration: 0.6)) {
+                    lastGradientColors = newColors.map { Color(nsColor: $0) }
+                }
+            }
+        }
+        .onChange(of: mediaController.mediaInfo.title) { newTitle in
+            // When track changes to "Nothing Playing", start a 3s timer before showing fallback
+            if newTitle == "Nothing Playing" {
+                fallbackTimer?.invalidate()
+                fallbackTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: false) { _ in
+                    withAnimation(.easeInOut(duration: 1.0)) {
+                        shouldShowFallback = true
+                    }
+                }
+            } else {
+                // If we start playing something, cancel the fallback
+                fallbackTimer?.invalidate()
+                shouldShowFallback = false
             }
         }
     }
